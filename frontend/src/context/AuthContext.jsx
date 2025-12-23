@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 export const authContext = createContext(null);
 
 const AuthContext = ({ children }) => {
-  const url = "http://localhost:3000";
+  const url = "https://chatsapp-qz7b.onrender.com";
 
   const [token, setToken] = useState(JSON.parse(localStorage.getItem("token")));
   const [authUser, setAuthuser] = useState(JSON.parse(localStorage.getItem("user")));
