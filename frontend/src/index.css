@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: regular;
+  src: url(../AeonikTRIAL-Regular.otf);
+}
 
+body{
+  font-family: regular;
+}
 ::-webkit-scrollbar{
   display: none;
 }
