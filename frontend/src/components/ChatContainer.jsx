@@ -130,7 +130,7 @@ const ChatContainer = ({ setShowRightSidebar }) => {
 
         })}
         {typingUser && (
-          <p className="text-xs absolute bottom-14 rounded-xl text-center  bg-violet-500/30 text-white w-[10%] p-2 ml-3 mb-2">
+          <p className="text-xs mt-1 text-gray-400 ml-3 mb-2">
             Typing...
           </p>
         )}
