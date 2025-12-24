@@ -10,6 +10,7 @@ const ChatContext = ({ children }) => {
   const [users, setusers] = useState([])
   const [selectedUser, setselectedUser] = useState(null)
   const [unseenMessages, setunseenMessages] = useState({})
+  const [typingUser, setTypingUser] = useState(null);
 
   const { socket, url, authUser } = useContext(authContext)
 
@@ -31,46 +32,46 @@ const ChatContext = ({ children }) => {
     }
   }
 
-const sendMessage = async (messageData) => {
-  try {
-    const token = JSON.parse(localStorage.getItem("token"));
-    const res = await axios.post(
-      `${url}/api/message/send/${selectedUser._id}`,
-      messageData,
-      {
-        withCredentials: true,
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
-      }
-    );
-    setmessages((prev) => [...prev, res.data.userMessage]);
+  const sendMessage = async (messageData) => {
+    try {
+      const token = JSON.parse(localStorage.getItem("token"));
+      const res = await axios.post(
+        `${url}/api/message/send/${selectedUser._id}`,
+        messageData,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+      setmessages((prev) => [...prev, res.data.userMessage]);
 
-  } catch (err) {
-    toast.error("Failed to send message");
+    } catch (err) {
+      toast.error("Failed to send message");
+    }
+  };
+
+  const sendImage = async (imageData) => {
+    try {
+      const token = JSON.parse(localStorage.getItem("token"));
+      const res = await axios.post(
+        `${url}/api/message/sendImage/${selectedUser._id}`,
+        imageData,
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+      setmessages((prev) => [...prev, res.data.userMessage]);
+
+    } catch (err) {
+      toast.error("Failed to send message");
+    }
+
   }
-};
-
-const sendImage = async(imageData) =>{
-  try {
-    const token = JSON.parse(localStorage.getItem("token"));
-    const res = await axios.post(
-      `${url}/api/message/sendImage/${selectedUser._id}`,
-      imageData,
-      {
-        withCredentials: true,
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
-      }
-    );
-    setmessages((prev) => [...prev, res.data.userMessage]);
-
-  } catch (err) {
-    toast.error("Failed to send message");
-  }
-
-}
 
 
 
@@ -93,35 +94,53 @@ const sendImage = async(imageData) =>{
     }
   }
 
-const subscribeToMessage = () => {
-  if (!socket) return;
+  const subscribeToMessage = () => {
+    if (!socket) return;
 
-  socket.off("newMessage");
+    socket.off("newMessage");
 
-  socket.on("newMessage", (newMessage) => {
-    const isRelevant = newMessage.senderId === authUser._id || newMessage.receiverId === authUser._id;
-    if (!isRelevant) return;
-    if (selectedUser && (newMessage.senderId === selectedUser._id || newMessage.senderId === authUser._id)) {
-      setmessages((prev) => {
-        if (prev.some(m => m._id === newMessage._id)) return prev;
-        return [...prev, newMessage];
-      });
-    } 
-    else {
-      setunseenMessages((prev) => ({
-        ...prev,
-        [newMessage.senderId]: (prev[newMessage.senderId] || 0) + 1,
-      }));
-    }
-  });
-};
+    socket.on("newMessage", (newMessage) => {
+      const isRelevant = newMessage.senderId === authUser._id || newMessage.receiverId === authUser._id;
+      if (!isRelevant) return;
+      if (selectedUser && (newMessage.senderId === selectedUser._id || newMessage.senderId === authUser._id)) {
+        setmessages((prev) => {
+          if (prev.some(m => m._id === newMessage._id)) return prev;
+          return [...prev, newMessage];
+        });
+      }
+      else {
+        setunseenMessages((prev) => ({
+          ...prev,
+          [newMessage.senderId]: (prev[newMessage.senderId] || 0) + 1,
+        }));
+      }
+    });
+
+    socket.on("typing", ({ senderId }) => {
+      if (selectedUser && senderId === selectedUser._id) {
+        setTypingUser(senderId);
+      }
+    });
+
+    socket.on("stopTyping", ({ senderId }) => {
+      if (selectedUser && senderId === selectedUser._id) {
+        setTypingUser(null);
+      }
+    });
+
+  };
 
 
 
 
   useEffect(() => {
     subscribeToMessage()
-    return () => socket?.off("newMessage")
+    return () => {
+      socket?.off("newMessage");
+      socket?.off("typing");
+      socket?.off("stopTyping");
+    };
+
   }, [socket, selectedUser])
 
   return (
@@ -136,7 +155,9 @@ const subscribeToMessage = () => {
         unseenMessages,
         setunseenMessages,
         getMessages,
-        sendImage
+        sendImage,
+        typingUser,
+        setTypingUser
       }}
     >
       {children}

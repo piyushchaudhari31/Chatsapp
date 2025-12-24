@@ -10,8 +10,10 @@ import toast from 'react-hot-toast'
 const ChatContainer = ({ setShowRightSidebar }) => {
 
   const scrollend = useRef()
-  const { messages, selectedUser, setselectedUser, sendMessage, getMessages, sendImage } = useContext(chatContext)
-  const { authUser, onlineUsers } = useContext(authContext)
+  const typingTimeoutRef = useRef(null);
+
+  const { messages, selectedUser, setselectedUser, sendMessage, getMessages, sendImage, typingUser } = useContext(chatContext)
+  const { authUser, onlineUsers, socket } = useContext(authContext)
 
   const [input, setInput] = useState('');
 
@@ -19,13 +21,19 @@ const ChatContainer = ({ setShowRightSidebar }) => {
 
   // handle sending a message
   const handleSendMessage = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!input.trim()) return null;
+    if (!input.trim()) return;
 
-    await sendMessage({ text: input.trim() })
-    setInput("")
-  }
+    socket.emit("stopTyping", {
+      senderId: authUser._id,
+      receiverId: selectedUser._id,
+    });
+
+    await sendMessage({ text: input.trim() });
+    setInput("");
+  };
+
   const handleSendImage = async (e) => {
     const file = e.target.files[0];
     if (!file || !file.type.startsWith("image/")) {
@@ -41,6 +49,37 @@ const ChatContainer = ({ setShowRightSidebar }) => {
     // Reset file input
     e.target.value = "";
   };
+
+  const handleTyping = (e) => {
+    const value = e.target.value;
+    setInput(value);
+
+    if (!value.trim()) {
+      socket.emit("stopTyping", {
+        senderId: authUser._id,
+        receiverId: selectedUser._id,
+      });
+      return;
+    }
+
+    socket.emit("typing", {
+      senderId: authUser._id,
+      receiverId: selectedUser._id,
+    });
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit("stopTyping", {
+        senderId: authUser._id,
+        receiverId: selectedUser._id,
+      });
+    }, 1000);
+  };
+
+
 
 
 
@@ -77,22 +116,10 @@ const ChatContainer = ({ setShowRightSidebar }) => {
           return (
             <div key={idx} className={`flex items-end gap-2 justify-end ${msg.senderId !== authUser._id && 'flex-row-reverse'}`}>
               {msg.image ? (
-                <div className="w-[230px] h-[230px] mb-8 rounded-lg overflow-hidden border border-gray-700 bg-black">
-                  <img
-                    src={msg.image}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <img src={msg.image} alt="" className='max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8' />
               ) : (
-                <p
-                  className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-5 break-words whitespace-pre-wrap bg-violet-500/30 text-white ${msg.senderId === authUser._id ? "rounded-br-none" : "rounded-bl-none"
-                    }`}
-                >
-                  {msg.text}
-                </p>
+                <p className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-5 break-words whitespace-pre-wrap  bg-violet-500/30 text-white ${msg.senderId === authUser._id ? "rounded-br-none " : "rounded-bl-none"}`}>{msg.text}</p>
               )}
-
               <div className='text-center text-xs'>
                 <img src={msg.senderId === authUser._id ? authUser?.profilePic || assets.avatar_icon : selectedUser?.profilePic || assets.avatar_icon} alt="" className='w-7 rounded-full' />
                 <p className='text-gray-500'>{formatMessageTime(msg.createdAt)}</p>
@@ -102,6 +129,11 @@ const ChatContainer = ({ setShowRightSidebar }) => {
           )
 
         })}
+        {typingUser && (
+          <p className="text-xs absolute bottom-14 rounded-xl text-center  bg-violet-500/30 text-white w-[10%] p-2 ml-3 mb-2">
+            Typing...
+          </p>
+        )}
 
         <div ref={scrollend}></div>
 
@@ -109,7 +141,7 @@ const ChatContainer = ({ setShowRightSidebar }) => {
       {/*---bottom -area */}
       <div className='absolute bottom-0 z-40 left-0 right-0 flex items-center gap-3 p-3 z-20'>
         <div className='flex-1 flex  items-center bg-gray-100/12 px-3 rounded-full'>
-          <input onChange={(e) => setInput(e.target.value)} value={input} onKeyDown={(e) => e.key === "Enter" ? handleSendMessage(e) : null} type="text" placeholder='send Message' className='flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder-gray-400' />
+          <input onChange={handleTyping} value={input} onKeyDown={(e) => e.key === "Enter" ? handleSendMessage(e) : null} type="text" placeholder='send Message' className='flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder-gray-400' />
           <input type="file" id='image' onChange={handleSendImage} accept='image/png , image/jpeg' hidden />
           <label htmlFor="image">
             <img src={assets.gallery_icon} className='w-4 mr-2 cursor-pointer' alt="" />
