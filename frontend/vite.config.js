@@ -69,7 +69,7 @@ export default defineConfig({
         start_url:".",
         display:"standalone"
       },
-      registerType:"prompt"
+      registerType:"autoUpdate"
     }),
   ],
 });
